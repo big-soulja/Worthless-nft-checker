@@ -1,9 +1,6 @@
 const { Network, Alchemy } = require("alchemy-sdk");
-const Bottleneck = require("bottleneck");
 require("dotenv").config();
 
-var sdk = require("api")("@opensea/v1.0#12u2v92etliyqlisv");
-sdk.auth("48eb8844a1884d19a298c296e4254c5b");
 const settings = {
   apiKey: process.env.ALCHEMY_API_KEY,
   network: Network.ETH_MAINNET,
@@ -15,12 +12,6 @@ const ownerAddr = "bigsoulja.eth";
 console.log("fetching NFTs for address:", ownerAddr);
 console.log("...");
 var notWorthlessNft = 0;
-
-const limiter = new Bottleneck({
-  reservoir: 5, // Maximum number of requests
-  reservoirRefreshAmount: 5, // Number of requests to add back to the reservoir after waiting
-  reservoirRefreshInterval: 5000, // Time interval to add back requests to the reservoir (in ms)
-});
 
 const getNftsPercentage = async () => {
   const nftsForOwner = await alchemy.nft.getNftsForOwner(ownerAddr);
