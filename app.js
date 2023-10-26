@@ -13,6 +13,7 @@ console.log("fetching NFTs for address:", ownerAddr);
 console.log("...");
 let notWorthlessNft = 0;
 let cleared = 0;
+let fpMap = new Map();
 
 const getNftsPercentage = async () => {
   let startTime = new Date();
@@ -28,6 +29,20 @@ const getNftsPercentage = async () => {
   const nftPromises = [];
 
   for await (const nft of alchemy.nft.getNftsForOwnerIterator(ownerAddr)) {
+    if (fpMap.has(nft.contract.address)) {
+      console.log("Skipping duplicate contract address:", nft.contract.address);
+      if (
+        fpMap.get(nft.contract.address) !== undefined &&
+        fpMap.get(nft.contract.address) > 0.01
+      ) {
+        totalFp += fp;
+        console.log(totalFp);
+        console.log("not worthless");
+        notWorthlessNft = notWorthlessNft + 1;
+      }
+      continue; // Skip processing this NFT
+    }
+
     nftPromises.push(
       (async () => {
         const queryParams = {
@@ -38,19 +53,18 @@ const getNftsPercentage = async () => {
         var floor = await alchemy.nft.getFloorPrice(nft.contract.address);
         var fp = floor.openSea.floorPrice;
         var sales = await alchemy.nft.getNftSales(queryParams);
-        //console.log(Object.keys(sales).length);
-
-        if (
-          fp !== undefined &&
-          fp > 0.01 &&
-          Object.keys(sales.nftSales).length > 0
-        ) {
+        const hasSales = Object.keys(sales.nftSales).length > 0;
+        if (hasSales) {
+          fpMap.set(nft.contract.address, fp);
+        }
+        if (fp !== undefined && fp > 0.01 && hasSales) {
           console.log("==");
           console.log(fp);
           totalFp += fp;
           console.log(totalFp);
           console.log("not worthless");
           notWorthlessNft = notWorthlessNft + 1;
+          fpMap.set(nft.contract.address, fp);
         }
       })()
     );
