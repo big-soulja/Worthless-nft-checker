@@ -40,17 +40,11 @@ const getNftsPercentage = async () => {
       continue;
     }
 
+    // use a memoized function to get the floor price and sales
     nftPromises.push(
       (async () => {
-        const queryParams = {
-          contractAddress: nft.contract.address,
-          fromBlock: blockNumber,
-          limit: 1,
-        };
-        const floor = await alchemy.nft.getFloorPrice(nft.contract.address);
-        const fp = floor.openSea.floorPrice;
-        const sales = await alchemy.nft.getNftSales(queryParams);
-        const hasSales = Object.keys(sales.nftSales).length > 0;
+        const fp = await getFloorPrice(nft.contract.address);
+        const hasSales = await getSales(nft.contract.address, blockNumber);
         if (fp !== undefined && fp > 0.01 && hasSales) {
           console.log("==");
           console.log(fp);
@@ -65,9 +59,10 @@ const getNftsPercentage = async () => {
       })()
     );
 
-    if (nftPromises.length >= 70) {
+    if (nftPromises.length >= 85) {
       await Promise.all(nftPromises);
       nftPromises.length = 0;
+      fpMap.clear();
     }
   }
 
@@ -90,6 +85,53 @@ const getNftsPercentage = async () => {
   console.log(`The program ran for ${elapsedTime} milliseconds.`);
 };
 
-getNftsPercentage();
+// create a memoized function to get the floor price
+const getFloorPrice = (() => {
+  // create a cache object
+  const cache = {};
+  // return a function that takes a contract address as an argument
+  return async (contractAddress) => {
+    // check if the cache has the contract address as a key
+    if (cache[contractAddress]) {
+      // return the cached value
+      return cache[contractAddress];
+    } else {
+      // call the alchemy API to get the floor price
+      const floor = await alchemy.nft.getFloorPrice(contractAddress);
+      // store the floor price in the cache
+      cache[contractAddress] = floor.openSea.floorPrice;
+      // return the floor price
+      return cache[contractAddress];
+    }
+  };
+})();
 
-// clean up promise all and fix readability
+// create a memoized function to get the sales
+const getSales = (() => {
+  // create a cache object
+  const cache = {};
+  // return a function that takes a contract address and a block number as arguments
+  return async (contractAddress, blockNumber) => {
+    // create a query string from the contract address and the block number
+    const query = `${contractAddress}-${blockNumber}`;
+    // check if the cache has the query as a key
+    if (cache[query]) {
+      // return the cached value
+      return cache[query];
+    } else {
+      // call the alchemy API to get the sales
+      const queryParams = {
+        contractAddress: contractAddress,
+        fromBlock: blockNumber,
+        limit: 1,
+      };
+      const sales = await alchemy.nft.getNftSales(queryParams);
+      // store the boolean value of whether there are sales in the cache
+      cache[query] = Object.keys(sales.nftSales).length > 0;
+      // return the boolean value
+      return cache[query];
+    }
+  };
+})();
+
+getNftsPercentage();
