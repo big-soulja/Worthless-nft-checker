@@ -8,6 +8,7 @@ const settings = {
 
 const alchemy = new Alchemy(settings);
 
+//change this to ens or an adress to lookup your wallet
 const ownerAddr = "bigsoulja.eth";
 console.log("fetching NFTs for address:", ownerAddr);
 console.log("...");
@@ -15,20 +16,26 @@ console.log("...");
 let notWorthlessNft = 0;
 let totalFp = 0;
 
+//main function
 const getNftsPercentage = async () => {
+  //marks when the program started
   const startTime = new Date();
+  //get how many 721 and 1155 tokens there are
   const nftsForOwner = await alchemy.nft.getNftsForOwner(ownerAddr);
   const totalNftCount = nftsForOwner.totalCount;
   console.log("number of NFTs found:", totalNftCount);
   console.log("...");
 
+  //blocknumber a month ago
   const blockNumber = (await alchemy.core.getBlockNumber()) - 219000;
   console.log(blockNumber);
 
+  //map of already looked up nfts
   const fpMap = new Map();
   const nftPromises = [];
 
   for await (const nft of alchemy.nft.getNftsForOwnerIterator(ownerAddr)) {
+    //checking if this contracted was already searched
     if (fpMap.has(nft.contract.address)) {
       console.log("Skipping duplicate contract address:", nft.contract.address);
       if (fpMap.get(nft.contract.address) > 0.01) {
@@ -40,11 +47,12 @@ const getNftsPercentage = async () => {
       continue;
     }
 
-    // use a memoized function to get the floor price and sales
+    //creating a new promise for this contract
     nftPromises.push(
       (async () => {
         const fp = await getFloorPrice(nft.contract.address);
         const hasSales = await getSales(nft.contract.address, blockNumber);
+        fpMap.set(nft.contract.address, fp);
         if (fp !== undefined && fp > 0.01 && hasSales) {
           console.log("==");
           console.log(fp);
@@ -53,16 +61,12 @@ const getNftsPercentage = async () => {
           console.log("not worthless");
           notWorthlessNft++;
         }
-        if (hasSales) {
-          fpMap.set(nft.contract.address, fp);
-        }
       })()
     );
 
     if (nftPromises.length >= 85) {
       await Promise.all(nftPromises);
       nftPromises.length = 0;
-      fpMap.clear();
     }
   }
 
